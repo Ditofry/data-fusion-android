@@ -23,6 +23,8 @@ import org.opencv.core.Mat;
 import org.opencv.imgproc.Imgproc;
 
 import java.io.IOException;
+import java.io.PipedReader;
+import java.io.PipedWriter;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
@@ -40,10 +42,11 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 
     // TODO: Add GUI interface for connecting to TCP server?
     private final int SERVER_PORT = 5001;
-    private final String SERVER_IP = "10.0.0.9";
+    private final String SERVER_IP = "128.138.221.51";
 
-    private Boolean sendingFrame = false;
-    private Mat capturedFrame;
+    public Boolean sendingFrame = false;
+    public Boolean frameRequested = false;
+    public Mat capturedFrame;
 
     // These variables are used (at the moment) to fix camera orientation from 270degree to 0degree
     Mat mRgba;
@@ -87,7 +90,9 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         mOpenCvCameraView.setVisibility(SurfaceView.VISIBLE);
         mOpenCvCameraView.setCvCameraViewListener(this);
         // Listen to server in the background
-        ServerListener serverThread = new ServerListener(capturedFrame, SERVER_PORT, SERVER_IP);
+        PipedReader r = new PipedReader();
+        PipedWriter w = new PipedWriter();
+        ServerListener serverThread = new ServerListener(this, SERVER_PORT, SERVER_IP, r);
         serverThread.start();
     }
 
@@ -127,13 +132,14 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
     public void onCameraViewStopped() {}
 
     public Mat onCameraFrame(CvCameraViewFrame inputFrame) {
-        if (sendingFrame){
+        if (!sendingFrame & frameRequested){
             capturedFrame = inputFrame.rgba();
+            frameRequested = false;
         }
         return inputFrame.rgba();
     }
 
     public void triggerFrameCapture(View view){
-        sendingFrame = true;
+        frameRequested = true;
     }
 }
