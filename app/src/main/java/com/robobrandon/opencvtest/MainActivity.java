@@ -6,6 +6,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.MenuItem;
 import android.view.SurfaceView;
+import android.view.View;
 import android.view.WindowManager;
 
 import org.opencv.android.JavaCameraView;
@@ -20,11 +21,16 @@ import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.imgproc.Imgproc;
+
+import java.io.IOException;
+import java.net.InetAddress;
 import java.net.Socket;
+import java.net.UnknownHostException;
+
+import com.robobrandon.opencvtest.ClientThread;
+import com.robobrandon.opencvtest.ServerListener;
 
 public class MainActivity extends AppCompatActivity implements CvCameraViewListener2 {
-
-
     // Used for logging success or failure messages
     private static final String TAG = "OCVSample::Activity";
 
@@ -33,16 +39,21 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
     private CameraBridgeViewBase mOpenCvCameraView;
 
     // TODO: Add GUI interface for connecting to TCP server?
-    private static final int SERVER_PORT = 5000;
-    private static final String SERVER_IP = "10.0.2.2";
+    private final int SERVER_PORT = 5001;
+    private final String SERVER_IP = "10.0.0.9";
 
     private Boolean sendingFrame = false;
+    private Mat capturedFrame;
 
     // These variables are used (at the moment) to fix camera orientation from 270degree to 0degree
     Mat mRgba;
     Mat mRgbaF;
     Mat mRgbaT;
 
+    // This is an openCV Manager dependency.  It's possible to compile the openCV manager
+    // "statically" within the project, but it's not recommended, so I didn't.  Therefore anyone who
+    // wishes to use this app must obey the download request and put the manager app on their phone
+    // from the play store :P
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
         public void onManagerConnected(int status) {
@@ -64,18 +75,20 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         Log.i(TAG, "Instantiated new " + this.getClass());
     }
 
-
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        Log.i(TAG, "called onCreate");
+        // Call parent
         super.onCreate(savedInstanceState);
+        // Wire up the camera template and disable "sleep"
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.show_camera);
-
+        // Get the camera going
         mOpenCvCameraView = (CameraBridgeViewBase) findViewById(R.id.show_camera_activity_java_surface_view);
         mOpenCvCameraView.setVisibility(SurfaceView.VISIBLE);
         mOpenCvCameraView.setCvCameraViewListener(this);
+        // Listen to server in the background
+        ServerListener serverThread = new ServerListener(capturedFrame, SERVER_PORT, SERVER_IP);
+        serverThread.start();
     }
 
     @Override
@@ -106,51 +119,21 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
     }
 
     public void onCameraViewStarted(int width, int height) {
-
         mRgba = new Mat(height, width, CvType.CV_8UC4);
         mRgbaF = new Mat(height, width, CvType.CV_8UC4);
         mRgbaT = new Mat(width, width, CvType.CV_8UC4);
     }
 
-    public void onCameraViewStopped() {
-//        mRgba.release();
-    }
+    public void onCameraViewStopped() {}
 
     public Mat onCameraFrame(CvCameraViewFrame inputFrame) {
-
-//        // TODO Auto-generated method stub
-//        mRgba = inputFrame.rgba();
-//        // Rotate mRgba 90 degrees
-//        Core.transpose(mRgba, mRgbaT);
-//        Imgproc.resize(mRgbaT, mRgbaF, mRgbaF.size(), 0,0, 0);
-//        Core.flip(mRgbaF, mRgba, 1);
-//
-//        return mRgba; // This function must return
-        sendFrameCapture(inputFrame.rgba());
+        if (sendingFrame){
+            capturedFrame = inputFrame.rgba();
+        }
         return inputFrame.rgba();
     }
 
-    public void triggerFrameCapture(){
+    public void triggerFrameCapture(View view){
         sendingFrame = true;
     }
-
-    private void sendFrameCapture(Mat capturedFrame){
-        // Can use this as a backup method...  save image and THEN stream
-        //Bitmap bm = Bitmap.createBitmap(capturedFrame.cols(), capturedFrame.rows(),Bitmap.Config.ARGB_8888);
-        //Utils.matToBitmap(capturedFrame, bm);
-
-        // Possible that I'll need to specify elemSize?
-        //int size = (int) capturedFrame.total() * capturedFrame.elemSize();
-        int size = (int) (capturedFrame.total());
-        byte[] buffer = new byte[size];
-
-//        with open("media/omg.png", "rb") as imageFile:
-//        f = imageFile.read()
-//        b = bytearray(f)
-//        newMsg = "SendingFrame,%d\n" % len(b)
-//        sock.sendall(newMsg)
-//
-//        sock.send(b)
-    }
-
 }
